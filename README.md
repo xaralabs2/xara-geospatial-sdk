@@ -1,17 +1,17 @@
-# @xara/geospatial-client
+# @xaralabs/geospatial-client
 
 Official TypeScript/JavaScript SDK for the Xara Geospatial Engine API.
 
 ## Installation
 
 ```bash
-npm install @xara/geospatial-client
+npm install @xaralabs/geospatial-client
 ```
 
 ## Quick Start
 
 ```typescript
-import { XaraGeoClient } from "@xara/geospatial-client";
+import { XaraGeoClient } from "@xaralabs/geospatial-client";
 
 const geo = new XaraGeoClient({
   baseUrl: "https://geo.xaralabs.ai/api",
@@ -264,7 +264,7 @@ import {
   XaraNotFoundError,
   XaraValidationError,
   XaraRateLimitError,
-} from "@xara/geospatial-client";
+} from "@xaralabs/geospatial-client";
 
 try {
   await geo.createParcel({ ... });
