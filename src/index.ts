@@ -1,0 +1,33 @@
+export { XaraGeoClient } from "./client";
+export type {
+  XaraGeoClientConfig,
+  SpatialEntity,
+  CreateSpatialEntityParams,
+  NearbySearchParams,
+  PolygonSearchParams,
+  Parcel,
+  CreateParcelParams,
+  CheckParcelOverlapParams,
+  ParcelVersion,
+  CreateParcelVersionParams,
+  ParcelSplitParams,
+  ParcelSplitResult,
+  ParcelMergeParams,
+  ParcelMergeResult,
+  ParcelLineageEntry,
+  SpatialEvent,
+  GetSpatialEventsParams,
+  H3StatsParams,
+  H3Stat,
+  ClusterParams,
+  ClusterResult,
+  HealthStatus,
+  XaraApiError,
+} from "./types";
+export {
+  XaraGeoError,
+  XaraAuthError,
+  XaraNotFoundError,
+  XaraValidationError,
+  XaraRateLimitError,
+} from "./errors";
