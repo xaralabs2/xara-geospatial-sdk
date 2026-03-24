@@ -1,5 +1,5 @@
 {
-  "name": "@xara/geospatial-client",
+  "name": "@xaralabs/geospatial-client",
   "version": "1.0.0",
   "description": "Official TypeScript/JavaScript SDK for the Xara Geospatial Engine API",
   "type": "module",
