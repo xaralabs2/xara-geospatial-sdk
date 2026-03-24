@@ -1,4 +1,4 @@
-import { XaraGeoClient, XaraValidationError } from "@xara/geospatial-client";
+import { XaraGeoClient, XaraValidationError } from "@xaralabs/geospatial-client";
 
 const geo = new XaraGeoClient({
   baseUrl: "https://geo.xaralabs.ai/api",
