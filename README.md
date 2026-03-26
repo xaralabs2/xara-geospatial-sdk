@@ -1,451 +1,488 @@
 # @xaralabs/geospatial-client
 
-  Official TypeScript/JavaScript SDK for the Xara Geospatial Engine API.
+  The official TypeScript/JavaScript SDK for the **Xara Geospatial Engine** — a multi-tenant spatial intelligence API built on PostGIS, H3 hexagonal indexing, and geohash encoding.
+
+  [![npm version](https://img.shields.io/npm/v/@xaralabs/geospatial-client.svg)](https://www.npmjs.com/package/@xaralabs/geospatial-client)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-blue.svg)](https://www.typescriptlang.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+  ---
+
+  ## Why This SDK?
+
+  Building location-aware applications requires solving the same hard problems repeatedly — spatial indexing, coordinate resolution, boundary lookups, parcel management, and entity tracking. The Xara Geospatial Engine handles all of this as a managed API, and this SDK gives you type-safe access from any TypeScript or JavaScript application.
+
+  **Without Xara**, you would need to:
+  - Set up and maintain PostGIS infrastructure
+  - Implement H3 and geohash indexing yourself
+  - Build parcel geometry management with split/merge/versioning
+  - Create your own spatial identity system
+  - Handle multi-tenant data isolation
+  - Build real-time spatial event streaming
+
+  **With this SDK**, you get all of that through simple function calls with full TypeScript autocompletion and type safety.
+
+  ---
+
+  ## Use Cases
+
+  ### Property & Land Management
+  Track parcels with auto-generated Global Parcel IDs (GPIDs), detect boundary overlaps, split and merge parcels, and maintain full version history with temporal queries.
+
+  ```typescript
+  // Create a parcel — GPID is auto-generated
+  const parcel = await client.createParcel({
+    property_id: 'lot-42',
+    polygon_coordinates: [
+      [3.4219, 6.4541], [3.4225, 6.4541],
+      [3.4225, 6.4535], [3.4219, 6.4535],
+      [3.4219, 6.4541]
+    ]
+  });
+  // parcel.gpid → "GPID-NG-LA-IKJ-a1b2c3d4"
+
+  // Check for overlaps before registering new land
+  const overlap = await client.checkParcelOverlap({
+    polygon_coordinates: newBoundary
+  });
+
+  // Split a parcel into subdivisions
+  const split = await client.splitParcel(parcel.id, {
+    child_polygons: [subdivisionA, subdivisionB]
+  });
+  ```
+
+  ### Fleet & Delivery Logistics
+  Track vehicles and delivery agents in real-time, find nearby drivers, calculate distances, and manage delivery zones.
+
+  ```typescript
+  // Register a delivery vehicle
+  await client.createEntity({
+    entity_type: 'vehicle',
+    entity_id: 'truck-007',
+    latitude: 6.4541,
+    longitude: 3.4219
+  });
+
+  // Find all drivers within 2km of a pickup location
+  const nearby = await client.searchNearby({
+    lat: 6.4541, lon: 3.4219,
+    radius: 2000,
+    entity_type: 'driver'
+  });
+
+  // Calculate distance between warehouse and customer
+  const distance = await client.calculateDistance({
+    from: { lat: 6.4541, lon: 3.4219 },
+    to: { lat: 6.5100, lon: 3.3792 }
+  });
+  // distance.distance_km → 8.34
+  ```
+
+  ### Security & Surveillance Intelligence
+  Power camera networks with spatial context — resolve camera locations to administrative boundaries, find nearby infrastructure, and stream spatial events.
+
+  ```typescript
+  // Resolve a camera's location to its administrative context
+  const location = await client.resolveLocation(6.4541, 3.4219);
+  // → { address, admin_area, locality, ... }
+
+  // Find what boundaries contain a detection point
+  const boundaries = await client.resolveBoundary(6.4541, 3.4219);
+  // → [{ name: "Ikeja", type: "LGA", ... }]
+
+  // Stream spatial events in real-time
+  const events = await client.streamEvents();
+  // → Server-Sent Events stream of spatial activity
+  ```
+
+  ### Spatial Data Infrastructure
+  Build and traverse spatial relationship graphs, create globally unique spatial identifiers, and perform H3-based clustering analysis.
+
+  ```typescript
+  // Create a Global Spatial ID for any coordinate
+  const gsid = await client.createGSID({
+    latitude: 6.4541,
+    longitude: 3.4219,
+    label: 'HQ Office'
+  });
+  // gsid.gsid → "GSID-8867369-1a2b3c"
+
+  // Build a spatial graph
+  const zone = await client.createGraphNode({
+    node_type: 'zone',
+    label: 'Downtown District',
+    latitude: 6.4541,
+    longitude: 3.4219
+  });
+
+  // Cluster entities by H3 hexagons
+  const clusters = await client.cluster({
+    resolution: 7,
+    entity_type: 'sensor'
+  });
+  ```
+
+  ---
 
   ## Installation
 
   ```bash
+  # npm
   npm install @xaralabs/geospatial-client
+
+  # pnpm
+  pnpm add @xaralabs/geospatial-client
+
+  # yarn
+  yarn add @xaralabs/geospatial-client
   ```
+
+  **Requirements:** Node.js 18+ (uses native `fetch`)
+
+  ---
 
   ## Quick Start
 
   ```typescript
-  import { XaraGeoClient } from "@xaralabs/geospatial-client";
+  import { XaraGeoClient } from '@xaralabs/geospatial-client';
 
-  const geo = new XaraGeoClient({
-    baseUrl: "https://geo.xaralabs.ai/api",
-    tenantId: "solideo",
-    apiKey: "sk_live_xxxxx",
+  const client = new XaraGeoClient({
+    baseUrl: 'https://your-engine-url.com/api',
+    tenantId: 'your-tenant-id',
+    apiKey: 'sk_live_your_api_key'
   });
 
-  // Resolve a location from coordinates
-  const location = await geo.resolveLocation(6.4498, 3.4743);
-  console.log(location.district); // "Lekki Phase 1"
-
-  // Create a GSID
-  const gsid = await geo.createGSID({
-    name: "Lekki Phase 1",
-    gsid_type: "district",
-    latitude: 6.4498,
-    longitude: 3.4743,
-    zone: "Lekki",
-  });
-  console.log(gsid.gsid); // "XG-NG-LAG-LEK-000001"
-
-  // Create a parcel with GPID
-  const parcel = await geo.createParcel({
-    property_id: "550e8400-e29b-41d4-a716-446655440000",
-    polygon_coordinates: [
-      [3.35, 6.45],
-      [3.36, 6.45],
-      [3.36, 6.46],
-      [3.35, 6.46],
-      [3.35, 6.45],
-    ],
-  });
-  console.log(parcel.gpid); // GPID-NG-LAG-IKJ-000001
+  // Verify connection
+  const health = await client.health();
+  console.log(health.status); // "ok"
   ```
 
-  ## Authentication
-
-  The SDK automatically injects authentication headers on every request:
-
-  - `X-TENANT-ID` — your tenant identifier
-  - `X-API-KEY` — your API key
+  ---
 
   ## API Reference
 
-  ### Initialization
+  ### Configuration
 
   ```typescript
-  const geo = new XaraGeoClient({
-    baseUrl: "https://geo.xaralabs.ai/api", // API base URL
-    tenantId: "solideo",                      // Your tenant ID
-    apiKey: "sk_live_xxxxx",                  // Your API key
-    timeout: 30000,                           // Request timeout in ms (optional)
-  });
-  ```
-
-  ### Location Resolution
-
-  #### `resolveLocation(lat, lng)`
-
-  Resolve coordinates to a location identity via boundary containment.
-
-  ```typescript
-  const result = await geo.resolveLocation(6.4498, 3.4743);
-  // Returns: { resolved: true, district: "Lekki Phase 1", city: "Lagos", state: "Lagos", country: "Nigeria", boundaries: [...] }
-  ```
-
-  #### `resolveBoundary(lat, lng)`
-
-  Find all boundaries containing a point.
-
-  ```typescript
-  const result = await geo.resolveBoundary(6.45, 3.47);
-  // Returns: { boundaries: [{ name, boundary_type, country, state, city }], count }
-  ```
-
-  #### `searchLocations(query, limit?)`
-
-  Fuzzy search locations by name.
-
-  ```typescript
-  const result = await geo.searchLocations("lekki", 20);
-  // Returns: { results: [{ id, name, location_type, latitude, longitude, ... }], count }
-  ```
-
-  ### Distance & Roads
-
-  #### `calculateDistance(params)`
-
-  Calculate distance between two points.
-
-  ```typescript
-  const result = await geo.calculateDistance({
-    pointA: [6.4498, 3.4743],
-    pointB: [6.4281, 3.4219],
-  });
-  // Returns: { distance: { meters: 6272.54, kilometers: 6.27 } }
-  ```
-
-  #### `findNearbyRoads(params)`
-
-  Find nearby road segments within a radius.
-
-  ```typescript
-  const result = await geo.findNearbyRoads({
-    lat: 6.445,
-    lng: 3.47,
-    radius: 2000, // meters, default 500
-    limit: 10,     // default 10
-  });
-  // Returns: { roads: [{ id, name, road_type, city, speed_limit, distance_meters }], count }
-  ```
-
-  ### GSID (Global Spatial Identity)
-
-  #### `createGSID(params)`
-
-  Create a new GSID entry.
-
-  ```typescript
-  const entry = await geo.createGSID({
-    name: "Lekki Phase 1",
-    gsid_type: "district",
-    latitude: 6.4498,
-    longitude: 3.4743,
-    country: "Nigeria",
-    state: "Lagos",
-    city: "Lagos",
-    zone: "Lekki",
-  });
-  // Returns: { id, gsid: "XG-NG-LAG-LEK-000001", name, gsid_type, ... }
-  ```
-
-  #### `lookupGSID(gsid)`
-
-  Lookup a GSID by its identifier.
-
-  ```typescript
-  const entry = await geo.lookupGSID("XG-NG-LAG-LEK-000001");
-  ```
-
-  #### `resolveGSID(lat, lng, radius?)`
-
-  Find nearest GSIDs to a coordinate.
-
-  ```typescript
-  const result = await geo.resolveGSID(6.45, 3.474, 5000);
-  // Returns: { results: [{ ...gsidEntry, distance_meters }], count }
-  ```
-
-  ### Spatial Graph
-
-  #### `createGraphNode(params)`
-
-  Create a graph node.
-
-  ```typescript
-  const node = await geo.createGraphNode({
-    node_type: "boundary",
-    name: "Nigeria",
-    latitude: 9.0,
-    longitude: 7.5,
-  });
-  ```
-
-  #### `createGraphEdge(params)`
-
-  Create a directed edge between nodes.
-
-  ```typescript
-  const edge = await geo.createGraphEdge({
-    from_node_id: lagosId,
-    to_node_id: nigeriaId,
-    relation_type: "INSIDE",
-  });
-  ```
-
-  #### `getGraphChildren(nodeId)`
-
-  Get child nodes (nodes with INSIDE relationship to this node).
-
-  ```typescript
-  const result = await geo.getGraphChildren(nigeriaId);
-  // Returns: { children: [{ id, graph_node_type, name, ... }], count }
-  ```
-
-  #### `getGraphParents(nodeId)`
-
-  Get parent nodes.
-
-  ```typescript
-  const result = await geo.getGraphParents(lekkiId);
-  // Returns: { parents: [{ id, graph_node_type: "boundary", name: "Lagos", ... }], count }
-  ```
-
-  #### `getGraphConnected(nodeId, relation?)`
-
-  Get all connected nodes, optionally filtered by relation type.
-
-  ```typescript
-  const result = await geo.getGraphConnected(lagosId);
-  // Returns: { connected: [{ ...node, relation: "INSIDE" }], count }
-  ```
-
-  #### `getGraphNode(nodeId)`
-
-  Get full node details with all edges.
-
-  ```typescript
-  const result = await geo.getGraphNode(lagosId);
-  // Returns: { node: {...}, edges: [{ from_name, to_name, graph_relation_type, ... }] }
+  interface XaraGeoClientConfig {
+    baseUrl: string;     // Your Xara Geospatial Engine API URL
+    tenantId: string;    // Your tenant identifier
+    apiKey: string;      // Your API key (starts with sk_live_)
+    timeout?: number;    // Request timeout in ms (default: 30000)
+  }
   ```
 
   ### Spatial Entities
 
-  #### `createSpatialEntity(params)`
+  Entities are any geolocated objects — vehicles, sensors, cameras, people, buildings.
 
-  Create a spatial entity (property, vehicle, sensor, etc.).
+  | Method | Description |
+  |--------|-------------|
+  | `createEntity(params)` | Register a new spatial entity |
+  | `searchNearby(params)` | Find entities within a radius |
+  | `searchPolygon(params)` | Find entities within a polygon |
 
   ```typescript
-  const entity = await geo.createSpatialEntity({
-    entity_type: "property",
-    entity_id: "550e8400-e29b-41d4-a716-446655440000",
-    latitude: 6.45,
-    longitude: 3.35,
+  // Create
+  const entity = await client.createEntity({
+    entity_type: 'sensor',
+    entity_id: 'temp-sensor-42',
+    latitude: 6.4541,
+    longitude: 3.4219
+  });
+
+  // Search nearby (radius in meters)
+  const nearby = await client.searchNearby({
+    lat: 6.4541, lon: 3.4219,
+    radius: 500,
+    entity_type: 'sensor' // optional filter
+  });
+
+  // Search within polygon
+  const inArea = await client.searchPolygon({
+    polygon: [[3.42, 6.45], [3.43, 6.45], [3.43, 6.46], [3.42, 6.46], [3.42, 6.45]],
+    entity_type: 'sensor'
   });
   ```
 
-  #### `searchNearby(params)`
+  ### Parcels & Land Management
 
-  Find entities within a radius (meters).
+  Full parcel lifecycle — create, split, merge, version, and query lineage.
 
-  ```typescript
-  const results = await geo.searchNearby({
-    lat: 6.45,
-    lon: 3.35,
-    radius: 5000,
-    entity_type: "property", // optional
-  });
-  ```
-
-  #### `polygonSearch(params)`
-
-  Find entities within a polygon.
+  | Method | Description |
+  |--------|-------------|
+  | `createParcel(params)` | Create a parcel with auto-generated GPID |
+  | `getParcel(id)` | Get parcel details |
+  | `checkParcelOverlap(params)` | Check if a polygon overlaps existing parcels |
+  | `splitParcel(id, params)` | Split a parcel into children |
+  | `mergeParcels(params)` | Merge multiple parcels into one |
+  | `getParcelVersions(id)` | Get version history |
+  | `createParcelVersion(id, params)` | Create a new geometry version |
+  | `getParcelLineage(id)` | Get split/merge ancestry |
 
   ```typescript
-  const results = await geo.polygonSearch({
-    polygon: [
-      [3.35, 6.45],
-      [3.36, 6.45],
-      [3.36, 6.46],
-      [3.35, 6.46],
-      [3.35, 6.45],
-    ],
-    entity_type: "property", // optional
-  });
-  ```
-
-  ### Parcel Registry
-
-  #### `createParcel(params)`
-
-  Create a parcel with automatic GPID generation.
-
-  ```typescript
-  const parcel = await geo.createParcel({
-    property_id: "550e8400-e29b-41d4-a716-446655440000",
+  // Create with auto-GPID
+  const parcel = await client.createParcel({
+    property_id: 'block-7-lot-3',
     polygon_coordinates: [
-      [3.35, 6.45],
-      [3.36, 6.45],
-      [3.36, 6.46],
-      [3.35, 6.46],
-      [3.35, 6.45],
-    ],
+      [3.4219, 6.4541], [3.4225, 6.4541],
+      [3.4225, 6.4535], [3.4219, 6.4535],
+      [3.4219, 6.4541] // closed ring
+    ]
   });
-  // Returns: { id, gpid, status, geohash, h3_index, area_sq_m, ... }
-  ```
+  console.log(parcel.gpid);     // "GPID-NG-LA-IKJ-a1b2c3d4"
+  console.log(parcel.area_sq_m); // 2847.5
 
-  #### `checkParcelOverlap(params)`
-
-  Check for overlapping parcels.
-
-  ```typescript
-  const overlaps = await geo.checkParcelOverlap({
-    polygon_coordinates: [[3.35, 6.45], ...],
+  // Split into two lots
+  const split = await client.splitParcel(parcel.id, {
+    child_polygons: [lotA_coords, lotB_coords]
   });
-  ```
 
-  ### Parcel Versioning
-
-  #### `createParcelVersion(parcelId, params)`
-
-  Create a new geometry version for a parcel.
-
-  ```typescript
-  const version = await geo.createParcelVersion(parcelId, {
-    polygon_coordinates: [[3.351, 6.451], ...],
+  // Merge parcels
+  const merged = await client.mergeParcels({
+    parent_parcel_ids: [parcelA.id, parcelB.id],
+    merged_polygon: combinedCoords
   });
-  // Returns: { id, version_number, geometry_hash, valid_from, ... }
+
+  // Query full lineage
+  const lineage = await client.getParcelLineage(parcel.id);
   ```
 
-  #### `getParcelVersions(parcelId)`
+  ### Location & Boundary Resolution
 
-  Get all versions of a parcel.
+  Resolve any coordinate to structured address and administrative boundary information.
+
+  | Method | Description |
+  |--------|-------------|
+  | `resolveLocation(lat, lon)` | Reverse geocode to structured address |
+  | `resolveBoundary(lat, lon)` | Find containing administrative boundaries |
+  | `searchLocations(query)` | Forward geocode / text search |
 
   ```typescript
-  const versions = await geo.getParcelVersions(parcelId);
+  const location = await client.resolveLocation(6.4541, 3.4219);
+  // → { formatted_address, admin_area, locality, ... }
+
+  const boundaries = await client.resolveBoundary(6.4541, 3.4219);
+  // → [{ name: "Ikeja", type: "LGA" }, { name: "Lagos", type: "State" }]
+
+  const results = await client.searchLocations('Ikeja Lagos');
+  // → [{ lat, lon, formatted_address, ... }]
   ```
 
-  ### Parcel Lineage
+  ### Distance & Roads
 
-  #### `splitParcel(parcelId, params)`
+  Calculate distances and find nearby road infrastructure.
 
-  Split a parcel into child parcels.
+  | Method | Description |
+  |--------|-------------|
+  | `calculateDistance(params)` | Haversine distance between two points |
+  | `getNearbyRoads(params)` | Find road segments near a point |
 
   ```typescript
-  const result = await geo.splitParcel(parcelId, {
-    child_polygons: [
-      [[3.35, 6.45], [3.355, 6.45], [3.355, 6.46], [3.35, 6.46], [3.35, 6.45]],
-      [[3.355, 6.45], [3.36, 6.45], [3.36, 6.46], [3.355, 6.46], [3.355, 6.45]],
-    ],
+  const dist = await client.calculateDistance({
+    from: { lat: 6.4541, lon: 3.4219 },
+    to: { lat: 6.5100, lon: 3.3792 }
   });
-  ```
+  console.log(dist.distance_km);  // 8.34
+  console.log(dist.bearing);      // 312.5
 
-  #### `mergeParcels(params)`
-
-  Merge multiple parcels into one.
-
-  ```typescript
-  const result = await geo.mergeParcels({
-    parent_parcel_ids: [parcelId1, parcelId2],
-    merged_polygon: [[3.35, 6.45], ...],
-  });
-  ```
-
-  #### `getParcelLineage(parcelId)`
-
-  Get the lineage history (splits, merges) for a parcel.
-
-  ```typescript
-  const lineage = await geo.getParcelLineage(parcelId);
-  ```
-
-  ### Spatial Events
-
-  #### `getSpatialEvents(params?)`
-
-  Get spatial event audit trail.
-
-  ```typescript
-  const events = await geo.getSpatialEvents({
-    event_type: "PARCEL_CREATED",
-    limit: 50,
+  const roads = await client.getNearbyRoads({
+    lat: 6.4541, lon: 3.4219,
+    radius: 200
   });
   ```
 
-  ### Analytics & Clustering
+  ### Global Spatial Identity (GSID)
 
-  #### `getH3Stats(params)`
+  Create and resolve globally unique spatial identifiers for any coordinate.
 
-  Get spatial analytics metrics by H3 cell.
+  | Method | Description |
+  |--------|-------------|
+  | `createGSID(params)` | Generate a new GSID |
+  | `getGSID(id)` | Look up a GSID |
+  | `resolveGSID(gsid)` | Resolve a GSID string to its location |
 
   ```typescript
-  const stats = await geo.getH3Stats({
-    h3_index: "89589c99207ffff",
-    metric_type: "density",
+  const gsid = await client.createGSID({
+    latitude: 6.4541,
+    longitude: 3.4219,
+    label: 'Main Office'
+  });
+  console.log(gsid.gsid); // "GSID-8867369-1a2b3c"
+
+  // Resolve back to location
+  const resolved = await client.resolveGSID('GSID-8867369-1a2b3c');
+  ```
+
+  ### Spatial Graph
+
+  Build and query spatial relationship networks.
+
+  | Method | Description |
+  |--------|-------------|
+  | `createGraphNode(params)` | Create a graph node |
+  | `createGraphEdge(params)` | Create an edge between nodes |
+  | `getGraphChildren(nodeId)` | Get child nodes |
+  | `getGraphParents(nodeId)` | Get parent nodes |
+  | `getGraphConnected(nodeId)` | Get all connected nodes |
+  | `getGraphNodeDetail(nodeId)` | Get full node detail |
+
+  ```typescript
+  // Build a zone hierarchy
+  const city = await client.createGraphNode({
+    node_type: 'city', label: 'Lagos',
+    latitude: 6.5244, longitude: 3.3792
+  });
+
+  const district = await client.createGraphNode({
+    node_type: 'district', label: 'Ikeja',
+    latitude: 6.4541, longitude: 3.4219
+  });
+
+  await client.createGraphEdge({
+    from_node_id: city.id,
+    to_node_id: district.id,
+    edge_type: 'contains',
+    weight: 1.0
+  });
+
+  // Traverse
+  const children = await client.getGraphChildren(city.id);
+  ```
+
+  ### Events & Clustering
+
+  Ingest and stream spatial events, perform H3-based clustering.
+
+  | Method | Description |
+  |--------|-------------|
+  | `getEvents(params)` | Query spatial events |
+  | `streamEvents()` | Real-time SSE event stream |
+  | `getH3Stats(params)` | H3 hexagonal statistics |
+  | `cluster(params)` | Spatial clustering |
+
+  ```typescript
+  // Query events
+  const events = await client.getEvents({
+    event_type: 'detection',
+    limit: 50
+  });
+
+  // H3 density analysis
+  const stats = await client.getH3Stats({
+    resolution: 7,
+    entity_type: 'camera'
+  });
+
+  // Cluster entities
+  const clusters = await client.cluster({
+    resolution: 6,
+    entity_type: 'vehicle'
   });
   ```
 
-  #### `runSpatialCluster(params)`
-
-  Cluster spatial entities using DBSCAN, K-means, or H3.
-
-  ```typescript
-  const clusters = await geo.runSpatialCluster({
-    algorithm: "dbscan",
-    epsilon: 500,
-    min_points: 3,
-  });
-  ```
-
-  ### Health
-
-  #### `healthCheck()`
-
-  Check API health status.
-
-  ```typescript
-  const health = await geo.healthCheck();
-  console.log(health.status); // "ok"
-  ```
+  ---
 
   ## Error Handling
 
+  The SDK provides typed error classes for different failure scenarios:
+
   ```typescript
   import {
-    XaraGeoError,
-    XaraAuthError,
-    XaraNotFoundError,
-    XaraValidationError,
-    XaraRateLimitError,
-  } from "@xaralabs/geospatial-client";
+    XaraGeoError,        // Base error (any API error)
+    XaraAuthError,       // 401 — invalid tenant ID or API key
+    XaraNotFoundError,   // 404 — resource not found
+    XaraValidationError, // 400 — invalid request parameters
+    XaraRateLimitError   // 429 — rate limit exceeded
+  } from '@xaralabs/geospatial-client';
 
   try {
-    await geo.createParcel({ ... });
-  } catch (err) {
-    if (err instanceof XaraValidationError) {
-      console.log(err.message);
-      console.log(err.reason);
-    } else if (err instanceof XaraAuthError) {
-      console.log("Authentication failed");
-    } else if (err instanceof XaraNotFoundError) {
-      console.log("Resource not found");
-    } else if (err instanceof XaraRateLimitError) {
-      console.log("Rate limited, retry later");
+    const parcel = await client.getParcel('non-existent-id');
+  } catch (error) {
+    if (error instanceof XaraNotFoundError) {
+      console.log('Parcel not found');
+    } else if (error instanceof XaraAuthError) {
+      console.log('Check your tenant ID and API key');
+    } else if (error instanceof XaraRateLimitError) {
+      console.log('Slow down — retry after a moment');
+    } else if (error instanceof XaraValidationError) {
+      console.log('Invalid parameters:', error.message);
     }
   }
   ```
 
-  ## Identity Formats
+  ---
 
-  **GPID** (Global Parcel Identity): `GPID-{COUNTRY}-{STATE}-{CITY}-{SEQUENCE}`
-  - Example: `GPID-NG-LAG-LEK-000042`
-  - Immutable, represents physical land
+  ## Multi-Tenant Architecture
 
-  **GSID** (Global Spatial Identity): `XG-{COUNTRY}-{CITY}-{ZONE}-{SEQUENCE}`
-  - Example: `XG-NG-LAG-LEK-000001`
-  - Identifies spatial locations, districts, landmarks
+  Each API call is scoped to your tenant. Data is fully isolated — you will never see another tenant's entities, parcels, or events.
 
-  ## Rate Limits
+  ```
+  Your App  →  SDK (tenantId + apiKey)  →  Xara Engine  →  Your Data Only
+  ```
 
-  - 1000 requests per minute per tenant
-  - SDK throws `XaraRateLimitError` when limit is exceeded
+  The SDK automatically attaches your `X-TENANT-ID` and `X-API-KEY` headers to every request.
+
+  ---
+
+  ## Platform Architecture
+
+  This SDK connects to the **Xara Geospatial Engine**, the foundational layer of the Xara Spatial Intelligence Platform:
+
+  ```
+  ┌─────────────────────────────────────────────────┐
+  │  Your Application                               │
+  │  (uses @xaralabs/geospatial-client)             │
+  └──────────────────┬──────────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────────┐
+  │  Xara Geospatial Engine (this SDK connects here)│
+  │  Coordinate resolution, spatial indexing,       │
+  │  parcel management, GPID/GSID, event streaming  │
+  └──────────────────┬──────────────────────────────┘
+                     │
+            ┌────────┴────────┐
+            ▼                 ▼
+  ┌──────────────┐  ┌──────────────────┐
+  │ CSI Platform │  │ Cortex AI Engine │
+  │ Spatial      │  │ Event reasoning, │
+  │ intelligence │  │ anomaly detect.  │
+  └──────────────┘  └──────────────────┘
+  ```
+
+  ### Products Built on This Platform
+
+  | Product | Use Case |
+  |---------|----------|
+  | **SoliDeo** | Land & property management with parcel tracking |
+  | **MacroLens** | Macro-level geospatial analytics and trend visualization |
+  | **PicckR** | Location-intelligent delivery and logistics optimization |
+  | **Xara Cortex** | Spatial forensic intelligence for security investigations |
+
+  ---
+
+  ## SDK Features
+
+  - **Full TypeScript types** — every request and response is typed
+  - **Automatic error classification** — typed error classes for each HTTP status
+  - **Request timeout** — configurable per-client with AbortController
+  - **Tree-shakable** — ESM and CJS dual exports
+  - **Zero runtime dependencies** — uses native `fetch` (Node 18+)
+  - **Comprehensive JSDoc** — inline documentation in your editor
+
+  ---
 
   ## License
 
   MIT
+
+  ---
+
+  ## Links
+
+  - [npm package](https://www.npmjs.com/package/@xaralabs/geospatial-client)
+  - [GitHub repository](https://github.com/xaralabs2/xara-geospatial-sdk)
+  - [Xara Labs](https://github.com/xaralabs2)
   
